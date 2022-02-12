@@ -8,15 +8,17 @@ resource "aws_vpc" "example" {
   }
 }
 
+
+resource "aws_internet_gateway" "example" {
+  vpc_id = aws_vpc.example.id
+}
+
+
 resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.example.id
   cidr_block              = "10.0.0.0/24"
   map_public_ip_on_launch = true
   availability_zone       = "ap-northeast-1a"
-}
-
-resource "aws_internet_gateway" "example" {
-  vpc_id = aws_vpc.example.id
 }
 
 resource "aws_route_table" "public" {
@@ -38,6 +40,23 @@ output "vpc_id" {
   value = aws_vpc.example.id
 }
 
-output "route_table_id" {
+output "public_subnet_route_table_id" {
   value = aws_route_table.public.id
 }
+
+resource "aws_subnet" "private" {
+  vpc_id                          = aws_vpc.example.id
+  cidr_block                      = "10.0.64.0/24"
+  availability_zone               = "ap-northeast-1a"
+  map_customer_owned_ip_on_launch = false
+}
+
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.example.id
+}
+
+resource "aws_route_table_assosiation" "private" {
+  subnet_id      = aws_subnet.private.id
+  route_table_id = aws_route_table.private.id
+}
+
