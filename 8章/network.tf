@@ -199,7 +199,26 @@ resource "aws_lb_listener" "http" {
   }
 }
 
-
 output "alb_dns_name" {
   value = aws_lb.example.dns_name
+}
+
+data "aws_route53_zone" "example" {
+  name = "toshiakisan1127.com"
+}
+
+resource "aws_route53_record" "test_example" {
+  zone_id = data.aws_route53_zone.example.zone_id
+  name    = data.aws_route53_zone.example.name
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.example.dns_name
+    zone_id                = aws_lb.example.zone_id
+    evaluate_target_health = true
+  }
+}
+
+output "domain_name" {
+  value = aws_route53_record.test_example.name
 }
