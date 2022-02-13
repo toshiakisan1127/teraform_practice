@@ -222,3 +222,76 @@ resource "aws_route53_record" "test_example" {
 output "domain_name" {
   value = aws_route53_record.test_example.name
 }
+
+resource "aws_acm_certificate" "example" {
+  domain_name               = aws_route53_record.test_example.name
+  subject_alternative_names = []
+  validation_method         = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_route53_record" "example_certificate" {
+
+  for_each = {
+    for dvo in aws_acm_certificate.example.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  name    = each.value.name
+  records = [each.value.record]
+  type    = each.value.type
+  zone_id = data.aws_route53_zone.example.id
+  ttl     = 60
+}
+
+resource "aws_acm_certificate_validation" "example" {
+  certificate_arn = aws_acm_certificate.example.arn
+  # for_each = {
+  #   for cert in aws_route53_record.example_certificate : cert.fqdn => {
+  #     fqdn = cert.fqnd
+  #   }
+  # }
+  # validation_record_fqdns = [each.value]
+
+  validation_record_fqdns = [aws_route53_record.example_certificate[data.aws_route53_zone.example.name].fqdn]
+}
+
+resource "aws_lb_listener" "https" {
+  load_balancer_arn = aws_lb.example.arn
+  port              = "443"
+  protocol          = "HTTPS"
+  certificate_arn   = aws_acm_certificate.example.arn
+  ssl_policy        = "ELBSecurityPolicy-2016-08"
+
+  default_action {
+    type = "fixed-response"
+
+    fixed_response {
+      content_type = "text/plain"
+      message_body = "これは「HTTPS」です"
+      status_code  = "200"
+    }
+  }
+}
+
+resource "aws_lb_listener" "redirect_http_to_https" {
+  load_balancer_arn = aws_lb.example.arn
+  port              = "8080"
+  protocol          = "HTTP"
+
+  default_action {
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+}
